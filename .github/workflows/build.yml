@@ -25,11 +25,13 @@ jobs:
 
       - name: Make icon.bmp (32x32, 4bpp, 16 colours)
         run: |
-          cd "$DSI_DIR"
-          python3 - <<'PY'
-          import struct
+          ICON=$(find . -iname 'icon.jpg' -not -path './.git/*' | head -1)
+          [ -n "$ICON" ] || { echo "icon.jpg not found in repo"; find . -not -path './.git/*' -type f | head -50; exit 1; }
+          echo "using $ICON"
+          python3 - "$ICON" "$DSI_DIR/icon.bmp" <<'PY'
+          import struct, sys
           from PIL import Image
-          im = Image.open("icon.jpg").convert("RGB").resize((32, 32)).quantize(16)
+          im = Image.open(sys.argv[1]).convert("RGB").resize((32, 32)).quantize(16)
           pal = (im.getpalette() or [])[:48]
           pal += [0] * (48 - len(pal))
           px = list(im.getdata())
@@ -42,9 +44,9 @@ jobs:
           off = 14 + 40 + len(palette)
           out = b"BM" + struct.pack("<IHHI", off + len(data), 0, 0, off)
           out += struct.pack("<IiiHHIIiiII", 40, 32, 32, 1, 4, 0, len(data), 2835, 2835, 16, 16)
-          open("icon.bmp", "wb").write(out + palette + data)
+          open(sys.argv[2], "wb").write(out + palette + data)
           PY
-          ls -l icon.bmp
+          ls -l "$DSI_DIR/icon.bmp"
 
       - name: Build
         run: |
@@ -53,8 +55,9 @@ jobs:
 
       - name: Mark as DSi-enhanced
         run: |
-          cd "$DSI_DIR"
-          python3 dsi_header.py vibribbon.nds
+          HDR=$(find . -name dsi_header.py -not -path './.git/*' | head -1)
+          [ -n "$HDR" ] || { echo "dsi_header.py not found in repo"; exit 1; }
+          python3 "$HDR" "$DSI_DIR/vibribbon.nds"
 
       - uses: actions/upload-artifact@v4
         with:
