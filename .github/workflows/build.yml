@@ -12,54 +12,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install tools
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends python3 python3-pil
-
-      - name: Find project folder
-        run: |
-          MK=$(grep -rl "UC Vib-Ribbon DSi port" --include=Makefile . | head -1)
-          [ -n "$MK" ] || { echo "Makefile not found"; find . -maxdepth 3 -not -path './.git/*'; exit 1; }
-          echo "DSI_DIR=$(dirname "$MK")" >> "$GITHUB_ENV"
-
-      - name: Make icon.bmp (32x32, 4bpp, 16 colours)
-        run: |
-          ICON=$(find . -iname 'icon.jpg' -not -path './.git/*' | head -1)
-          [ -n "$ICON" ] || { echo "icon.jpg not found in repo"; find . -not -path './.git/*' -type f | head -50; exit 1; }
-          echo "using $ICON"
-          python3 - "$ICON" "$DSI_DIR/icon.bmp" <<'PY'
-          import struct, sys
-          from PIL import Image
-          im = Image.open(sys.argv[1]).convert("RGB").resize((32, 32)).quantize(16)
-          pal = (im.getpalette() or [])[:48]
-          pal += [0] * (48 - len(pal))
-          px = list(im.getdata())
-          rows = []
-          for y in range(31, -1, -1):          # BMP is bottom-up
-              r = px[y * 32:(y + 1) * 32]
-              rows.append(bytes((r[i] << 4) | r[i + 1] for i in range(0, 32, 2)))
-          data = b"".join(rows)
-          palette = b"".join(bytes((pal[i * 3 + 2], pal[i * 3 + 1], pal[i * 3], 0)) for i in range(16))
-          off = 14 + 40 + len(palette)
-          out = b"BM" + struct.pack("<IHHI", off + len(data), 0, 0, off)
-          out += struct.pack("<IiiHHIIiiII", 40, 32, 32, 1, 4, 0, len(data), 2835, 2835, 16, 16)
-          open(sys.argv[2], "wb").write(out + palette + data)
-          PY
-          ls -l "$DSI_DIR/icon.bmp"
-
       - name: Build
-        run: |
-          cd "$DSI_DIR"
-          make
+        run: make
 
       - name: Mark as DSi-enhanced
-        run: |
-          HDR=$(find . -name dsi_header.py -not -path './.git/*' | head -1)
-          [ -n "$HDR" ] || { echo "dsi_header.py not found in repo"; exit 1; }
-          python3 "$HDR" "$DSI_DIR/vibribbon.nds"
+        run: python3 tools/dsi_header.py vibribbon.nds
 
       - uses: actions/upload-artifact@v4
         with:
           name: vibribbon-nds
-          path: ${{ env.DSI_DIR }}/vibribbon.nds
+          path: vibribbon.nds
