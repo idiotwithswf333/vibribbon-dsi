@@ -5,11 +5,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  # Folder that holds the Makefile, source/main.cpp, icon.jpg and dsi_header.py
-  # (the Makefile uses ../src, so this folder sits next to src/)
-  DSI_DIR: dsi
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,22 +12,49 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install ImageMagick
+      - name: Install tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends imagemagick python3
+          apt-get install -y --no-install-recommends python3 python3-pil
 
-      - name: Make icon.bmp (32x32, 16 colours)
-        working-directory: ${{ env.DSI_DIR }}
-        run: convert icon.jpg -resize 32x32! -colors 16 BMP3:icon.bmp
+      - name: Find project folder
+        run: |
+          MK=$(grep -rl "UC Vib-Ribbon DSi port" --include=Makefile . | head -1)
+          [ -n "$MK" ] || { echo "Makefile not found"; find . -maxdepth 3 -not -path './.git/*'; exit 1; }
+          echo "DSI_DIR=$(dirname "$MK")" >> "$GITHUB_ENV"
+
+      - name: Make icon.bmp (32x32, 4bpp, 16 colours)
+        run: |
+          cd "$DSI_DIR"
+          python3 - <<'PY'
+          import struct
+          from PIL import Image
+          im = Image.open("icon.jpg").convert("RGB").resize((32, 32)).quantize(16)
+          pal = (im.getpalette() or [])[:48]
+          pal += [0] * (48 - len(pal))
+          px = list(im.getdata())
+          rows = []
+          for y in range(31, -1, -1):          # BMP is bottom-up
+              r = px[y * 32:(y + 1) * 32]
+              rows.append(bytes((r[i] << 4) | r[i + 1] for i in range(0, 32, 2)))
+          data = b"".join(rows)
+          palette = b"".join(bytes((pal[i * 3 + 2], pal[i * 3 + 1], pal[i * 3], 0)) for i in range(16))
+          off = 14 + 40 + len(palette)
+          out = b"BM" + struct.pack("<IHHI", off + len(data), 0, 0, off)
+          out += struct.pack("<IiiHHIIiiII", 40, 32, 32, 1, 4, 0, len(data), 2835, 2835, 16, 16)
+          open("icon.bmp", "wb").write(out + palette + data)
+          PY
+          ls -l icon.bmp
 
       - name: Build
-        working-directory: ${{ env.DSI_DIR }}
-        run: make
+        run: |
+          cd "$DSI_DIR"
+          make
 
       - name: Mark as DSi-enhanced
-        working-directory: ${{ env.DSI_DIR }}
-        run: python3 dsi_header.py vibribbon.nds
+        run: |
+          cd "$DSI_DIR"
+          python3 dsi_header.py vibribbon.nds
 
       - uses: actions/upload-artifact@v4
         with:
