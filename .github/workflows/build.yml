@@ -1,0 +1,40 @@
+name: Build DSi
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # Folder that holds the Makefile, source/main.cpp, icon.jpg and dsi_header.py
+  # (the Makefile uses ../src, so this folder sits next to src/)
+  DSI_DIR: dsi
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ImageMagick
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends imagemagick python3
+
+      - name: Make icon.bmp (32x32, 16 colours)
+        working-directory: ${{ env.DSI_DIR }}
+        run: convert icon.jpg -resize 32x32! -colors 16 BMP3:icon.bmp
+
+      - name: Build
+        working-directory: ${{ env.DSI_DIR }}
+        run: make
+
+      - name: Mark as DSi-enhanced
+        working-directory: ${{ env.DSI_DIR }}
+        run: python3 dsi_header.py vibribbon.nds
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vibribbon-nds
+          path: ${{ env.DSI_DIR }}/vibribbon.nds
