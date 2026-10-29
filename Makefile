@@ -14,7 +14,7 @@ ARCH     := -march=armv5te -mtune=arm946e-s
 INC      := -I$(DEVKITPRO)/libnds/include -I$(DEVKITPRO)/calico/include -Isrc -Isource
 LIBDIRS  := -L$(DEVKITPRO)/libnds/lib -L$(DEVKITPRO)/calico/lib
 CXXFLAGS := -g -Wall -O2 $(ARCH) -fomit-frame-pointer -ffunction-sections -fdata-sections \
-            -fno-rtti -fno-exceptions -std=gnu++17 -DARM9 -DVIB_NDS $(INC)
+            -fno-rtti -fno-exceptions -std=gnu++17 -D__NDS__ -DARM9 -DVIB_NDS -Wno-format $(INC)
 LDFLAGS  := -specs=ds_arm9.specs -g $(ARCH) -Wl,--gc-sections -Wl,-Map,$(TARGET).map
 LIBS     := -lfat -lnds9
 

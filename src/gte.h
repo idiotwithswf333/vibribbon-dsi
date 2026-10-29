@@ -91,13 +91,13 @@ private:
     }
     void push_color() {
         d[20] = d[21]; d[21] = d[22];
-        auto cl = [](int32_t v) { return (uint32_t)std::clamp(v >> 4, 0, 255); };
+        auto cl = [](int32_t v) { return (uint32_t)std::clamp<int32_t>(v >> 4, 0, 255); };
         d[22] = (int32_t)(cl(d[25]) | cl(d[26]) << 8 | cl(d[27]) << 16 | ((uint32_t)d[6] & 0xFF000000u));
     }
-    void push_sz(int32_t z) { d[16] = d[17]; d[17] = d[18]; d[18] = d[19]; d[19] = std::clamp(z, 0, 0xFFFF); }
+    void push_sz(int32_t z) { d[16] = d[17]; d[17] = d[18]; d[18] = d[19]; d[19] = std::clamp<int32_t>(z, 0, 0xFFFF); }
     void push_sxy(int32_t x, int32_t y) {
         d[12] = d[13]; d[13] = d[14];
-        d[14] = (int32_t)((uint32_t)(uint16_t)std::clamp(x, -0x400, 0x3FF) | (uint32_t)std::clamp(y, -0x400, 0x3FF) << 16);
+        d[14] = (int32_t)((uint32_t)(uint16_t)std::clamp<int32_t>(x, -0x400, 0x3FF) | (uint32_t)std::clamp<int32_t>(y, -0x400, 0x3FF) << 16);
     }
     void vec(int v, int64_t out[3]) const {
         if (v == 3) { out[0] = (int16_t)d[9]; out[1] = (int16_t)d[10]; out[2] = (int16_t)d[11]; return; }
