@@ -12,6 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Calico (libnds 2.x) is a separate library and must be linked last.
+      - name: Fix link flags
+        run: |
+          sed -i -E 's/^LIBS[[:space:]]*:=.*/LIBS     := -lfat -lnds9 -lcalico_ds9/' Makefile
+          grep -n '^LIBS' Makefile
+
       - name: Build
         run: make
 
