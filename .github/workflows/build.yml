@@ -12,11 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Calico (libnds 2.x) is a separate library and must be linked last.
+      # libnds 2.x uses Calico: new startup spec + Calico library (linked last).
       - name: Fix link flags
         run: |
+          sed -i 's/-specs=ds_arm9\.specs/-specs=ds9.specs/' Makefile
           sed -i -E 's/^LIBS[[:space:]]*:=.*/LIBS     := -lfat -lnds9 -lcalico_ds9/' Makefile
-          grep -n '^LIBS' Makefile
+          grep -n 'specs\|^LIBS' Makefile
 
       - name: Build
         run: make
