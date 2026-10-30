@@ -228,6 +228,7 @@ int read_cpi(const std::string& dir) {
 }  // namespace
 
 int main() {
+    if (isDSiMode()) setCpuClock(true);   // ARM9 at 134 MHz instead of 67 MHz
     logo_init();
     top_console();
 
@@ -237,19 +238,16 @@ int main() {
         if (!probe) message("NOT ENOUGH RAM", "(needs the DSi's 16 MB)");
         std::free(probe);
     }
-    if (!fatInitDefault()) message("SD CARD NOT READY", "(fatInitDefault failed)");
+    if (!fatInitDefault()) message(kNoGame);
 
     std::string dir;
     for (const char* d : kDirs) if (file_exists(std::string(d) + "vibribbon.cue")) { dir = d; break; }
-    if (dir.empty()) message("NO CUE FOUND", "sd:/VIBRI/vibribbon.cue", "(check name + folder)");
+    if (dir.empty()) message(kNoGame);
 
     top_text(11, "LOADING...");
 
     auto img = std::make_unique<disc::Image>();
-    {
-        const std::string err = img->open(dir + "vibribbon.cue");
-        if (!err.empty()) message("CANNOT LOAD DISC", err.substr(0, 30).c_str(), err.size() > 30 ? err.substr(30, 30).c_str() : nullptr);
-    }
+    if (!img->open(dir + "vibribbon.cue").empty()) message(kNoGame);   // cue/bin missing or unreadable at that exact path
 
     const std::string boot = disc::boot_file(*img);
     std::vector<uint8_t> exe_file;
@@ -262,6 +260,7 @@ int main() {
     cpu->trace.enabled = false;
     cpu->attach_disc(img.get());
     if (const int cpi = read_cpi(dir)) cpu->cycles_per_instr = (uint32_t)cpi;
+    cpu->idle_skip = true;   // fast-forward the game's wait-for-next-frame loop (exact, see cpu.h)
 
     const std::string bios = find_bios(dir);
     if (!bios.empty() && cpu->load_bios(bios)) {
@@ -285,6 +284,7 @@ int main() {
 
     pad::TapFilter tap;   // the game's menus step twice for a held d-pad press; see pad_map.h
     std::vector<int16_t> audio((size_t)882 * 2);
+    unsigned frame_no = 0;
     for (;;) {
         cpu->pad1 = tap.apply(read_pad());
         if (!cpu->run_frame() && cpu->halted) {
@@ -293,7 +293,8 @@ int main() {
         // The SPU envelopes and the CD audio position only advance in audio_frame(), and the game waits on both,
         // so it must run every frame even though the samples are thrown away.
         cpu->audio_frame(cpu->frame_samples(), audio.data());
-        present(cpu->gpu);
+        // Drawing the 256x192 picture costs about as much as emulating a frame, so only every 2nd frame is shown.
+        if ((++frame_no & 1) == 0) present(cpu->gpu);
         logo_tick();
     }
 }
